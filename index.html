@@ -8,209 +8,250 @@
 body {
     margin: 0;
     overflow: hidden;
+    background: #87CEEB;
     display: flex;
     justify-content: center;
     align-items: center;
     height: 100vh;
-    background: #87CEEB;
 }
-
 canvas {
-    border: 2px solid black;
+    border: 3px solid #222;
 }
 </style>
 </head>
-
 <body>
+
 <canvas id="game"></canvas>
 
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 900;
-canvas.height = 450;
+canvas.width = 1000;
+canvas.height = 500;
 
 const gravity = 0.6;
+let score = 0;
 
-// 🎵 Zıplama sesi (küçük beep)
+// 🔊 Sesler
 function playJumpSound() {
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = audioCtx.createOscillator();
-    oscillator.type = "square";
-    oscillator.frequency.setValueAtTime(500, audioCtx.currentTime);
-    oscillator.connect(audioCtx.destination);
-    oscillator.start();
-    oscillator.stop(audioCtx.currentTime + 0.1);
+    const a = new (window.AudioContext || window.webkitAudioContext)();
+    const o = a.createOscillator();
+    o.frequency.value = 500;
+    o.connect(a.destination);
+    o.start();
+    o.stop(a.currentTime + 0.1);
+}
+
+function playCarrotSound() {
+    const a = new (window.AudioContext || window.webkitAudioContext)();
+    const o = a.createOscillator();
+    o.frequency.value = 800;
+    o.connect(a.destination);
+    o.start();
+    o.stop(a.currentTime + 0.1);
 }
 
 const player = {
     x: 100,
-    y: 330,
+    y: 380,
     width: 40,
     height: 40,
-    velocityX: 0,
-    velocityY: 0,
-    speed: 5,
-    jumpPower: 13,
+    vx: 0,
+    vy: 0,
+    speed: 6,
+    jump: 14,
     grounded: false
 };
 
 const platforms = [
-    { x: 0, y: 380, width: 900, height: 70 },
-    { x: 300, y: 300, width: 150, height: 20 },
-    { x: 550, y: 240, width: 150, height: 20 }
+    { x: 0, y: 430, w: 1000, h: 70 },
+    { x: 300, y: 350, w: 200, h: 20 },
+    { x: 650, y: 300, w: 200, h: 20 }
+];
+
+let carrots = [
+    { x: 350, y: 310, taken: false },
+    { x: 700, y: 260, taken: false }
 ];
 
 const clouds = [
-    { x: 100, y: 80, speed: 0.3 },
-    { x: 400, y: 50, speed: 0.2 },
-    { x: 700, y: 100, speed: 0.4 }
+    { x: 100, y: 80, s: 0.3 },
+    { x: 500, y: 60, s: 0.2 }
 ];
 
 const trees = [
-    { x: 150 },
-    { x: 500 },
-    { x: 750 }
+    { x: 200 },
+    { x: 550 },
+    { x: 850 }
 ];
 
 const keys = {};
 document.addEventListener("keydown", e => keys[e.code] = true);
 document.addEventListener("keyup", e => keys[e.code] = false);
 
-function detectCollision(a, b) {
-    return (
-        a.x < b.x + b.width &&
-        a.x + a.width > b.x &&
-        a.y < b.y + b.height &&
-        a.y + a.height > b.y
-    );
+function collide(a,b){
+    return a.x < b.x + b.w &&
+           a.x + a.width > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.height > b.y;
 }
 
-function update() {
+function update(){
 
-    if (keys["ArrowLeft"]) player.velocityX = -player.speed;
-    else if (keys["ArrowRight"]) player.velocityX = player.speed;
-    else player.velocityX = 0;
+    if(keys["ArrowLeft"]) player.vx = -player.speed;
+    else if(keys["ArrowRight"]) player.vx = player.speed;
+    else player.vx = 0;
 
-    if ((keys["Space"] || keys["ArrowUp"]) && player.grounded) {
-        player.velocityY = -player.jumpPower;
+    if((keys["Space"] || keys["ArrowUp"]) && player.grounded){
+        player.vy = -player.jump;
         player.grounded = false;
         playJumpSound();
     }
 
-    player.velocityY += gravity;
-
-    player.x += player.velocityX;
-    player.y += player.velocityY;
+    player.vy += gravity;
+    player.x += player.vx;
+    player.y += player.vy;
 
     player.grounded = false;
 
-    platforms.forEach(platform => {
-        if (detectCollision(player, platform)) {
-            if (player.velocityY > 0) {
-                player.y = platform.y - player.height;
-                player.velocityY = 0;
+    platforms.forEach(p=>{
+        if(collide(player,{x:p.x,y:p.y,w:p.w,h:p.h})){
+            if(player.vy>0){
+                player.y = p.y - player.height;
+                player.vy = 0;
                 player.grounded = true;
             }
         }
     });
 
-    // Bulut hareketi
-    clouds.forEach(cloud => {
-        cloud.x += cloud.speed;
-        if (cloud.x > canvas.width + 100) {
-            cloud.x = -100;
+    // Havuç toplama
+    carrots.forEach(c=>{
+        if(!c.taken &&
+           player.x < c.x+20 &&
+           player.x+player.width > c.x &&
+           player.y < c.y+30 &&
+           player.y+player.height > c.y){
+            c.taken = true;
+            score++;
+            playCarrotSound();
         }
     });
 
-    if (player.y > canvas.height) {
-        player.x = 100;
-        player.y = 330;
-        player.velocityY = 0;
-    }
+    // Bulut hareketi
+    clouds.forEach(cl=>{
+        cl.x += cl.s;
+        if(cl.x > canvas.width+100) cl.x = -100;
+    });
 }
 
-function drawBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "#87CEEB");
-    gradient.addColorStop(1, "#cceeff");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+function drawBackground(){
+    const g = ctx.createLinearGradient(0,0,0,canvas.height);
+    g.addColorStop(0,"#87CEEB");
+    g.addColorStop(1,"#dff6ff");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
-function drawCloud(x, y) {
-    ctx.fillStyle = "white";
+function drawTree(x){
+    ctx.fillStyle="#5d3a1a";
+    ctx.fillRect(x,340,25,90);
+
+    ctx.fillStyle="#2ecc71";
     ctx.beginPath();
-    ctx.arc(x, y, 20, 0, Math.PI * 2);
-    ctx.arc(x + 25, y, 25, 0, Math.PI * 2);
-    ctx.arc(x + 50, y, 20, 0, Math.PI * 2);
+    ctx.arc(x+12,330,40,0,Math.PI*2);
     ctx.fill();
 }
 
-function drawTree(x) {
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(x, 310, 20, 70);
-
-    ctx.fillStyle = "#2ecc71";
+function drawCloud(x,y){
+    ctx.fillStyle="white";
     ctx.beginPath();
-    ctx.arc(x + 10, 300, 30, 0, Math.PI * 2);
+    ctx.arc(x,y,25,0,Math.PI*2);
+    ctx.arc(x+30,y,30,0,Math.PI*2);
+    ctx.arc(x+60,y,25,0,Math.PI*2);
     ctx.fill();
 }
 
-function drawBunny() {
-
-    // Gövde
-    ctx.fillStyle = "white";
+function drawCarrot(x,y){
+    ctx.fillStyle="orange";
     ctx.beginPath();
-    ctx.arc(player.x + 20, player.y + 20, 20, 0, Math.PI * 2);
+    ctx.moveTo(x,y);
+    ctx.lineTo(x+10,y+30);
+    ctx.lineTo(x-10,y+30);
+    ctx.closePath();
     ctx.fill();
 
-    // Kulaklar
-    ctx.fillRect(player.x + 8, player.y - 20, 8, 25);
-    ctx.fillRect(player.x + 24, player.y - 20, 8, 25);
+    ctx.fillStyle="green";
+    ctx.fillRect(x-5,y-10,10,10);
+}
 
-    // Göz
-    ctx.fillStyle = "black";
+function drawBunny(){
+
+    // gövde
+    ctx.fillStyle="white";
     ctx.beginPath();
-    ctx.arc(player.x + 25, player.y + 15, 3, 0, Math.PI * 2);
+    ctx.arc(player.x+20,player.y+20,20,0,Math.PI*2);
     ctx.fill();
 
-    // Burun
-    ctx.fillStyle = "pink";
+    // kulaklar
+    ctx.fillRect(player.x+8,player.y-25,8,30);
+    ctx.fillRect(player.x+24,player.y-25,8,30);
+
+    // iç kulak
+    ctx.fillStyle="pink";
+    ctx.fillRect(player.x+10,player.y-20,4,20);
+    ctx.fillRect(player.x+26,player.y-20,4,20);
+
+    // göz
+    ctx.fillStyle="black";
     ctx.beginPath();
-    ctx.arc(player.x + 20, player.y + 22, 3, 0, Math.PI * 2);
+    ctx.arc(player.x+27,player.y+15,4,0,Math.PI*2);
+    ctx.fill();
+
+    // burun
+    ctx.fillStyle="pink";
+    ctx.beginPath();
+    ctx.arc(player.x+20,player.y+23,3,0,Math.PI*2);
     ctx.fill();
 }
 
-function draw() {
+function draw(){
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
     drawBackground();
 
-    clouds.forEach(cloud => drawCloud(cloud.x, cloud.y));
-    trees.forEach(tree => drawTree(tree.x));
+    clouds.forEach(c=>drawCloud(c.x,c.y));
+    trees.forEach(t=>drawTree(t.x));
 
-    platforms.forEach(platform => {
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+    platforms.forEach(p=>{
+        ctx.fillStyle="#8B4513";
+        ctx.fillRect(p.x,p.y,p.w,p.h);
+        ctx.fillStyle="#2ecc71";
+        ctx.fillRect(p.x,p.y,p.w,6);
+    });
 
-        ctx.fillStyle = "#2ecc71";
-        ctx.fillRect(platform.x, platform.y, platform.width, 5);
+    carrots.forEach(c=>{
+        if(!c.taken) drawCarrot(c.x,c.y);
     });
 
     drawBunny();
+
+    ctx.fillStyle="black";
+    ctx.font="20px Arial";
+    ctx.fillText("🥕 Score: "+score,20,30);
 }
 
-function gameLoop() {
+function loop(){
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 }
 
-gameLoop();
+loop();
 </script>
+
 </body>
 </html>
+
 
