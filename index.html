@@ -112,7 +112,15 @@ function update(){
     player.vy += gravity;
     player.x += player.vx;
     player.y += player.vy;
+    
+// Ekran sınırları
+if (player.x < 0) {
+    player.x = 0;
+}
 
+if (player.x + player.width > canvas.width) {
+    player.x = canvas.width - player.width;
+}
     player.grounded = false;
 
     platforms.forEach(p=>{
@@ -253,5 +261,8 @@ loop();
 
 </body>
 </html>
+
+
+
 
 
