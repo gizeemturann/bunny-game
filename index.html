@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Bunny Forest Adventure - Gizem</title>
+
+<style>
+body {
+    margin: 0;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background: #87CEEB;
+}
+
+canvas {
+    border: 2px solid black;
+}
+</style>
+
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = 900;
+canvas.height = 450;
+
+const gravity = 0.6;
+
+// 🔊 Basit zıplama sesi
+function playJumpSound() {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(400, audioCtx.currentTime);
+    oscillator.connect(audioCtx.destination);
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+}
+
+// 🐰 Tavşan
+const player = {
+    x: 100,
+    y: 300,
+    radius: 20,
+    velocityX: 0,
+    velocityY: 0,
+    speed: 5,
+    jumpPower: 12,
+    grounded: false
+};
+
+const platforms = [
+    { x: 0, y: 380, width: 900, height: 70 },
+    { x: 300, y: 300, width: 150, height: 20 },
+    { x: 550, y: 240, width: 150, height: 20 }
+];
+
+// 🥕 Havuç
+let carrot = { x: 600, y: 200, size: 20, collected: false };
+
+let clouds = [
+    { x: 100, y: 80 },
+    { x: 400, y: 60 },
+    { x: 700, y: 100 }
+];
+
+const keys = {};
+
+document.addEventListener("keydown", e => keys[e.code] = true);
+document.addEventListener("keyup", e => keys[e.code] = false);
+
+function detectCollisionCircleRect(circle, rect) {
+    let distX = Math.abs(circle.x - rect.x - rect.width / 2);
+    let distY = Math.abs(circle.y - rect.y - rect.height / 2);
+
+    if (distX > (rect.width / 2 + circle.radius)) return false;
+    if (distY > (rect.height / 2 + circle.radius)) return false;
+
+    return true;
+}
+
+function update() {
+
+    if (keys["ArrowLeft"]) player.velocityX = -player.speed;
+    else if (keys["ArrowRight"]) player.velocityX = player.speed;
+    else player.velocityX = 0;
+
+    if ((keys["Space"] || keys["ArrowUp"]) && player.grounded) {
+        player.velocityY = -player.jumpPower;
+        player.grounded = false;
+        playJumpSound();
+    }
+
+    player.velocityY += gravity;
+
+    player.x += player.velocityX;
+    player.y += player.velocityY;
+
+    player.grounded = false;
+
+    platforms.forEach(platform => {
+        if (detectCollisionCircleRect(player, platform) && player.velocityY > 0) {
+            player.y = platform.y - player.radius;
+            player.velocityY = 0;
+            player.grounded = true;
+        }
+    });
+
+    // Havuç toplama
+    if (!carrot.collected &&
+        player.x > carrot.x - 20 &&
+        player.x < carrot.x + 20 &&
+        player.y > carrot.y - 20 &&
+        player.y < carrot.y + 20) {
+        carrot.collected = true;
+    }
+
+    // Bulut hareketi
+    clouds.forEach(cloud => {
+        cloud.x += 0.3;
+        if (cloud.x > canvas.width + 50) cloud.x = -100;
+    });
+
+    if (player.y > canvas.height) {
+        player.x = 100;
+        player.y = 300;
+        player.velocityY = 0;
+    }
+}
+
+function drawBackground() {
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, "#87CEEB");
+    gradient.addColorStop(1, "#dff6ff");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Bulutlar
+    ctx.fillStyle = "white";
+    clouds.forEach(cloud => {
+        ctx.beginPath();
+        ctx.arc(cloud.x, cloud.y, 25, 0, Math.PI * 2);
+        ctx.arc(cloud.x + 30, cloud.y + 10, 20, 0, Math.PI * 2);
+        ctx.arc(cloud.x - 30, cloud.y + 10, 20, 0, Math.PI * 2);
+        ctx.fill();
+    });
+
+    // Ağaçlar
+    for (let i = 100; i < 900; i += 250) {
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(i, 300, 20, 80);
+
+        ctx.fillStyle = "#228B22";
+        ctx.beginPath();
+        ctx.arc(i + 10, 280, 40, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function draw() {
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawBackground();
+
+    // Zemin
+    ctx.fillStyle = "#654321";
+    ctx.fillRect(0, 380, canvas.width, 70);
+
+    ctx.fillStyle = "#2ecc71";
+    ctx.fillRect(0, 380, canvas.width, 10);
+
+    // Platformlar
+    platforms.slice(1).forEach(platform => {
+        ctx.fillStyle = "#8B4513";
+        ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+
+        ctx.fillStyle = "#2ecc71";
+        ctx.fillRect(platform.x, platform.y, platform.width, 5);
+    });
+
+    // 🥕 Havuç
+    if (!carrot.collected) {
+        ctx.fillStyle = "orange";
+        ctx.beginPath();
+        ctx.arc(carrot.x, carrot.y, carrot.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "green";
+        ctx.fillRect(carrot.x - 3, carrot.y - 15, 6, 10);
+    }
+
+    // 🐰 Tavşan gövde
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Kulaklar
+    ctx.fillRect(player.x - 8, player.y - 35, 8, 25);
+    ctx.fillRect(player.x + 5, player.y - 35, 8, 25);
+
+    // Göz
+    ctx.fillStyle = "black";
+    ctx.beginPath();
+    ctx.arc(player.x + 5, player.y - 5, 3, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
+
